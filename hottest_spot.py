@@ -1,23 +1,11 @@
 #import necessary libraries
-from fastapi import FastAPI, HTTPException
 import firebase_admin
 from firebase_admin import credentials, firestore
-import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-from fastapi.middleware.cors import CORSMiddleware
 
-#instantiating FastAPI , getter for location reccs
-app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],      # Open access to local mobile emulators
-    allow_credentials=True,
-    allow_methods=["*"],      # Allows all standard web operations (GET, POST)
-    allow_headers=["*"],
-)
+
+
 # Change this line:
-cred = credentials.Certificate(r"C:\Users\huizh\Downloads\test\geomugger_serviceAccountKey.json")
+cred = credentials.Certificate(r"C:\Users\huizh\Downloads\geomugger-backend\geomugger_serviceAccountKey.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
@@ -152,80 +140,17 @@ def topNspots(n):
         
 
 
-@app.get("/hottest-spots")
-def get_hottest_spots(n: int = 5):
+
+
+def update_hottest_spots_in_firestore(n: int = 5):
     try:
-        global my_data_w_header, my_data
-        my_data_w_header = get_reviews_with_parent_data()
-        my_data = my_data_w_header[1:]
-        
-        ranked_id = topNspots(n)
-        return {"hottest_spot_ids": ranked_id}
+        ranked_ids = topNspots(n)
+        db.collection("metadata").document("hottest_spots").set({"hottest_spot_ids": ranked_ids,
+                                                                 "updated_at": firestore.SERVER_TIMESTAMP})
     except Exception as e:
-        raise HTTPException(status_code = 500, detail = str(e))
-    
-print(calc_bayes_avg(my_data))
-        
-
-#return dict{string: List<String>} user_id: List
-def get_user_with_preferred_tag():
-
-    user_grp = db.collection('user').stream()
-    
-    res = {}
-    
-    for user in user_grp:
-        user_data = user.to_dict()
-        user_id = user.id
-        if user_id not in res:
-            res[user_id] = user_data['preferredTags']
-    return res
-
-def get_location_with_tags():
-    location_grp = db.collection("locations").stream()
-    res = {}
-    
-    for location in location_grp:
-        location_data = location.to_dict()
-        location_id = location.id
-        all_tags_dict = location_data.get("allTags", {})
-        #might want to include the tagCount too for weighted calculation of jaccard sim
-        tagName = list(all_tags_dict.keys())
-        if location_id not in res:
-            res[location_id] = tagName
-    return res
-
-
-def jaccard_sim(user, loc):
-    loc_set = set(loc)
-    user_set = set(user)
-    
-    numerator = len(loc_set.intersection(user_set))
-    denominator = len(loc_set.union(user_set))
-    
-    if (denominator == 0):
-        return 0.0
-    else:
-        return numerator/denominator
-
-
-    
-def get_recommended_spots():
-    
-    #load data
-    user_data = get_user_with_preferred_tag()
-    location_data = get_location_with_tags()
-    
-    res = {}
-    #sort location id based on jaccard similarity
-    
-    for user_id in user_data.keys():
-        res[user_id] = sorted(location_data.keys(),
-                              key = lambda x: jaccard_sim(user_data[user_id], location_data[x]), 
-                              reverse=True)
-    return res
-
-print(get_recommended_spots())
+        print(f"Error updating hottest_spot: {e}")
+if __name__ == "__main__":
+    update_hottest_spots_in_firestore(5)
     
     
     
