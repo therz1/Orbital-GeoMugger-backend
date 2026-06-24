@@ -1,23 +1,11 @@
 #import necessary libraries
-from fastapi import FastAPI, HTTPException
 import firebase_admin
 from firebase_admin import credentials, firestore
-import pandas as pd
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-from fastapi.middleware.cors import CORSMiddleware
 
-#instantiating FastAPI , getter for location reccs
-app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],      # Open access to local mobile emulators
-    allow_credentials=True,
-    allow_methods=["*"],      # Allows all standard web operations (GET, POST)
-    allow_headers=["*"],
-)
+
+
 # Change this line:
-cred = credentials.Certificate(r"C:\Users\huizh\Downloads\test\geomugger_serviceAccountKey.json")
+cred = credentials.Certificate(r"C:\Users\huizh\Downloads\geomugger-backend\geomugger_serviceAccountKey.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
@@ -67,7 +55,7 @@ def jaccard_sim(user, loc):
 
 
 #return dict{string: List<string>} userId: List<locationId> sorted based on descending jaccard similarity score
-def get_recommended_spots():
+def update_recommended_spots_in_firestore():
     
     #load data
     user_data = get_user_with_preferred_tag()
@@ -79,11 +67,12 @@ def get_recommended_spots():
     for user_id in user_data.keys():
         res[user_id] = sorted(location_data.keys(),
                               key = lambda x: jaccard_sim(user_data[user_id], location_data[x]), 
-                              reverse=True)
-    return res
+                              reverse=True)[:10]
+        #limit size to 10 elements to prevent taking up too much space
+        db.collection('user').document(user_id).set(
+            {"recommendedSpots": res[user_id],
+            "updatedAt": firestore.SERVER_TIMESTAMP}, merge= True)
+    
 
-print(get_recommended_spots())
     
-    
-    
-    
+update_recommended_spots_in_firestore()
