@@ -1,0 +1,13 @@
+# Ignore Firebase service account credentials
+*.json
+
+# Ignore virtual environments
+venv/
+.venv/
+env/
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+geomugger_serviceAccountKey.json
